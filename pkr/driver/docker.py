@@ -234,10 +234,12 @@ class DockerDriver(AbstractDriver):
 
             logfh.write(f"Building {image_name}{f'({target})' if target else ''} image...\n")
 
-            if no_rebuild:
-                image = len(self.docker.images(image_name)) == 1
+            # TP EDIT - skip rebuild by default but do rebuild if env var is
+            # set
+            has_image = len(self.docker.images(image_name)) == 1
+            do_rebuild = bool(os.getenv("TP_PKR_REBUILD")) or not has_image
 
-            if not no_rebuild or image is False:
+            if do_rebuild:
                 context = self.kard.env.get_container(service).get("context", self.DOCKER_CONTEXT)
                 stream = self.docker.build(
                     path=str(self.kard.path / context),
@@ -504,7 +506,9 @@ class DockerDriver(AbstractDriver):
         rep_tag = f"{registry_url}/{image_name}"
 
         try:
-            self.docker.pull(repository=rep_tag, tag=remote_tag)
+            # TP EDIT: don't pull try to pull images if we already have them
+            if len(self.docker.images(image_name)) != 1:
+                self.docker.pull(repository=rep_tag, tag=remote_tag)
 
             # Strip the repository tag
             self.docker.tag(
