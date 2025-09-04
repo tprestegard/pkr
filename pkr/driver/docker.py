@@ -234,10 +234,12 @@ class DockerDriver(AbstractDriver):
 
             logfh.write(f"Building {image_name}{f'({target})' if target else ''} image...\n")
 
-            if no_rebuild:
-                image = len(self.docker.images(image_name)) == 1
+            # Can only skip rebuilds if skipping the rebuild is requested via
+            # the no_rebuild kwarg AND we have the image already.
+            has_image = len(self.docker.images(image_name)) > 0
+            skip_rebuild = no_rebuild and has_image
 
-            if not no_rebuild or image is False:
+            if not skip_rebuild:
                 context = self.kard.env.get_container(service).get("context", self.DOCKER_CONTEXT)
                 stream = self.docker.build(
                     path=str(self.kard.path / context),
